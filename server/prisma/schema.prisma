@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UnitStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum LeaseStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum SignatureStatus {
+  PENDING
+  SENT
+  SIGNED
+}
+
+enum TransactionType {
+  CHARGE
+  PAYMENT
+  CREDIT
+  LATE_FEE
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  SHOWING
+  APPLIED
+  CONVERTED
+  LOST
+}
+
+model Property {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  city      String
+  state     String
+  zip       String
+  type      String
+  createdAt DateTime @default(now())
+
+  units Unit[]
+}
+
+model Unit {
+  id         String     @id @default(uuid())
+  propertyId String
+  unitNumber String
+  bedrooms   Int
+  bathrooms  Float
+  sqft       Int
+  rentAmount Float
+  status     UnitStatus @default(VACANT)
+  createdAt  DateTime   @default(now())
+
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  leases              Lease[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([propertyId])
+}
+
+model Tenant {
+  id              String   @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String   @unique
+  phone           String
+  emergencyContact String?
+  emergencyPhone  String?
+  createdAt       DateTime @default(now())
+
+  leases              Lease[]
+  transactions        Transaction[]
+  maintenanceRequests MaintenanceRequest[]
+  documents           Document[]
+}
+
+model Lease {
+  id              String          @id @default(uuid())
+  unitId          String
+  tenantId        String
+  startDate       DateTime
+  endDate         DateTime
+  rentAmount      Float
+  depositAmount   Float
+  depositPaid     Boolean         @default(false)
+  status          LeaseStatus     @default(ACTIVE)
+  documentUrl     String?
+  signatureStatus SignatureStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+
+  unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  documents    Document[]
+
+  @@index([unitId])
+  @@index([tenantId])
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  leaseId     String
+  tenantId    String
+  type        TransactionType
+  amount      Float
+  dueDate     DateTime
+  paidDate    DateTime?
+  description String?
+  balance     Float           @default(0)
+  createdAt   DateTime        @default(now())
+
+  lease  Lease  @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([leaseId])
+  @@index([tenantId])
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(uuid())
+  unitId      String
+  tenantId    String
+  title       String
+  description String
+  priority    MaintenancePriority @default(MEDIUM)
+  status      MaintenanceStatus   @default(OPEN)
+  photoUrls   String[]
+  vendorNotes String?
+  createdAt   DateTime            @default(now())
+  completedAt DateTime?
+
+  unit   Unit   @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([unitId])
+  @@index([tenantId])
+}
+
+model Lead {
+  id           String     @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String
+  phone        String?
+  unitInterest String?
+  source       String?
+  status       LeadStatus @default(NEW)
+  notes        String?
+  createdAt    DateTime   @default(now())
+}
+
+model Document {
+  id         String   @id @default(uuid())
+  leaseId    String?
+  tenantId   String?
+  type       String
+  fileName   String
+  fileUrl    String
+  uploadedAt DateTime @default(now())
+
+  lease  Lease?  @relation(fields: [leaseId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([leaseId])
+  @@index([tenantId])
+}
