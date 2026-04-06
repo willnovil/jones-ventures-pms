@@ -35,6 +35,12 @@ app.use("/api/transactions", transactionsRouter);
 app.use("/api/maintenance", maintenanceRouter);
 app.use("/api/leads", leadsRouter);
 
+// Global error handler
+app.use((err, _req, res, _next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Internal server error" });
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
