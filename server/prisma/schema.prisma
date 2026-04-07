@@ -15,6 +15,10 @@ enum UnitStatus {
 }
 
 enum LeaseStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SENT
   ACTIVE
   EXPIRED
   TERMINATED
@@ -111,9 +115,16 @@ model Lease {
   rentAmount      Float
   depositAmount   Float
   depositPaid     Boolean         @default(false)
-  status          LeaseStatus     @default(ACTIVE)
+  status          LeaseStatus     @default(DRAFT)
   documentUrl     String?
   signatureStatus SignatureStatus @default(PENDING)
+  leaseHtml       String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  executedAt      DateTime?
   createdAt       DateTime        @default(now())
 
   unit         Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)

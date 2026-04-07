@@ -41,6 +41,11 @@ export const api = {
   createLease: (data) => request("/leases", { method: "POST", body: JSON.stringify(data) }),
   updateLease: (id, data) => request(`/leases/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteLease: (id) => request(`/leases/${id}`, { method: "DELETE" }),
+  generateLeaseDocument: (id) => request(`/leases/${id}/generate`, { method: "POST" }),
+  reviewLease: (id) => request(`/leases/${id}/review`, { method: "POST" }),
+  approveLease: (id, approvedBy) => request(`/leases/${id}/approve`, { method: "POST", body: JSON.stringify({ approvedBy }) }),
+  sendLease: (id) => request(`/leases/${id}/send`, { method: "POST" }),
+  signLease: (id) => request(`/leases/${id}/sign`, { method: "POST" }),
 
   // Transactions
   getTransactions: () => request("/transactions"),

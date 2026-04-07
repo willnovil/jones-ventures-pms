@@ -4,6 +4,9 @@ const COLORS = {
   OCCUPIED: "bg-blue-50 text-blue-700 ring-blue-600/20",
   MAINTENANCE: "bg-orange-50 text-orange-700 ring-orange-600/20",
   // Lease statuses
+  DRAFT: "bg-gray-100 text-gray-700 ring-gray-500/20",
+  PENDING_REVIEW: "bg-yellow-50 text-yellow-700 ring-yellow-600/20",
+  APPROVED: "bg-purple-50 text-purple-700 ring-purple-600/20",
   ACTIVE: "bg-green-50 text-green-700 ring-green-600/20",
   EXPIRED: "bg-gray-100 text-gray-600 ring-gray-500/20",
   TERMINATED: "bg-red-50 text-red-700 ring-red-600/20",

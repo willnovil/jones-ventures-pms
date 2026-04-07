@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { renderLeaseHtml } from "../lib/leaseTemplate.js";
 
 const router = Router();
 
@@ -76,6 +77,97 @@ router.put("/:id", async (req, res) => {
     }
 
     res.json(lease);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// --- Workflow endpoints ---
+
+router.post("/:id/generate", async (req, res) => {
+  try {
+    const prisma = req.app.locals.prisma;
+    const lease = await prisma.lease.findUnique({
+      where: { id: req.params.id },
+      include: { tenant: true, unit: { include: { property: true } } },
+    });
+    if (!lease) return res.status(404).json({ error: "Not found" });
+
+    const leaseHtml = renderLeaseHtml(lease);
+    const updated = await prisma.lease.update({
+      where: { id: req.params.id },
+      data: { leaseHtml, status: "DRAFT" },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/:id/review", async (req, res) => {
+  try {
+    const prisma = req.app.locals.prisma;
+    const updated = await prisma.lease.update({
+      where: { id: req.params.id },
+      data: { status: "PENDING_REVIEW", reviewedAt: new Date() },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/:id/approve", async (req, res) => {
+  try {
+    const prisma = req.app.locals.prisma;
+    const updated = await prisma.lease.update({
+      where: { id: req.params.id },
+      data: {
+        status: "APPROVED",
+        approvedBy: req.body.approvedBy || "system",
+        approvedAt: new Date(),
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/:id/send", async (req, res) => {
+  try {
+    const prisma = req.app.locals.prisma;
+    const updated = await prisma.lease.update({
+      where: { id: req.params.id },
+      data: { status: "SENT", signatureStatus: "SENT", sentAt: new Date() },
+    });
+    res.json(updated);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post("/:id/sign", async (req, res) => {
+  try {
+    const prisma = req.app.locals.prisma;
+    const updated = await prisma.lease.update({
+      where: { id: req.params.id },
+      data: {
+        status: "ACTIVE",
+        signatureStatus: "SIGNED",
+        executedAt: new Date(),
+      },
+    });
+
+    // Mirror unit auto-status sync from PUT /:id
+    if (updated.unitId) {
+      await prisma.unit.update({
+        where: { id: updated.unitId },
+        data: { status: "OCCUPIED" },
+      });
+    }
+
+    res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

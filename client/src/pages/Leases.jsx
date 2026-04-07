@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -9,7 +10,17 @@ import { useToast } from "../components/Toast";
 
 const ITEMS_PER_PAGE = 10;
 
-const TABS = ["All", "Active", "Expired", "Terminated"];
+const TABS = ["All", "Draft", "Review", "Approved", "Sent", "Active", "Archived"];
+
+const TAB_STATUSES = {
+  All: null,
+  Draft: ["DRAFT"],
+  Review: ["PENDING_REVIEW"],
+  Approved: ["APPROVED"],
+  Sent: ["SENT"],
+  Active: ["ACTIVE"],
+  Archived: ["EXPIRED", "TERMINATED"],
+};
 
 const INITIAL_FORM = {
   tenantId: "",
@@ -19,7 +30,7 @@ const INITIAL_FORM = {
   rentAmount: "",
   depositAmount: "",
   depositPaid: false,
-  status: "ACTIVE",
+  status: "DRAFT",
   signatureStatus: "PENDING",
 };
 
@@ -44,6 +55,7 @@ function getInitials(firstName, lastName) {
 
 export default function Leases() {
   const addToast = useToast();
+  const navigate = useNavigate();
 
   const [leases, setLeases] = useState([]);
   const [tenants, setTenants] = useState([]);
@@ -93,7 +105,8 @@ export default function Leases() {
   // --- Filtering & search ---
 
   const filtered = leases.filter((l) => {
-    if (activeTab !== "All" && l.status !== activeTab.toUpperCase()) return false;
+    const allowed = TAB_STATUSES[activeTab];
+    if (allowed && !allowed.includes(l.status)) return false;
     if (search) {
       const q = search.toLowerCase();
       const tenantName = l.tenant
@@ -136,12 +149,13 @@ export default function Leases() {
 
   // --- Tab counts ---
 
-  const tabCounts = {
-    All: leases.length,
-    Active: leases.filter((l) => l.status === "ACTIVE").length,
-    Expired: leases.filter((l) => l.status === "EXPIRED").length,
-    Terminated: leases.filter((l) => l.status === "TERMINATED").length,
-  };
+  const tabCounts = TABS.reduce((acc, tab) => {
+    const allowed = TAB_STATUSES[tab];
+    acc[tab] = allowed
+      ? leases.filter((l) => allowed.includes(l.status)).length
+      : leases.length;
+    return acc;
+  }, {});
 
   // --- Modal handlers ---
 
@@ -161,7 +175,7 @@ export default function Leases() {
       rentAmount: lease.rentAmount ?? "",
       depositAmount: lease.depositAmount ?? "",
       depositPaid: lease.depositPaid ?? false,
-      status: lease.status || "ACTIVE",
+      status: lease.status || "DRAFT",
       signatureStatus: lease.signatureStatus || "PENDING",
     });
     setModalOpen(true);
@@ -393,7 +407,11 @@ export default function Leases() {
                     const unitNum = lease.unit?.unitNumber || "—";
 
                     return (
-                      <tr key={lease.id} className="hover:bg-gray-50/50 transition-colors">
+                      <tr
+                        key={lease.id}
+                        onClick={() => navigate(`/leases/${lease.id}`)}
+                        className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                      >
                         {/* Tenant */}
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-3">
@@ -449,7 +467,10 @@ export default function Leases() {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => openEdit(lease)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEdit(lease);
+                              }}
                               className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                               title="Edit"
                             >
@@ -468,7 +489,10 @@ export default function Leases() {
                               </svg>
                             </button>
                             <button
-                              onClick={() => setDeleteTarget(lease)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteTarget(lease);
+                              }}
                               className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                               title="Delete"
                             >
@@ -674,6 +698,10 @@ export default function Leases() {
                 onChange={handleChange}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
               >
+                <option value="DRAFT">Draft</option>
+                <option value="PENDING_REVIEW">Pending Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="SENT">Sent</option>
                 <option value="ACTIVE">Active</option>
                 <option value="EXPIRED">Expired</option>
                 <option value="TERMINATED">Terminated</option>

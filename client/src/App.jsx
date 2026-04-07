@@ -6,6 +6,7 @@ import Properties from "./pages/Properties";
 import Units from "./pages/Units";
 import Tenants from "./pages/Tenants";
 import Leases from "./pages/Leases";
+import LeaseDetail from "./pages/LeaseDetail";
 import Transactions from "./pages/Transactions";
 import Maintenance from "./pages/Maintenance";
 import Leads from "./pages/Leads";
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/units" element={<Units />} />
             <Route path="/tenants" element={<Tenants />} />
             <Route path="/leases" element={<Leases />} />
+            <Route path="/leases/:id" element={<LeaseDetail />} />
             <Route path="/transactions" element={<Transactions />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/leads" element={<Leads />} />
