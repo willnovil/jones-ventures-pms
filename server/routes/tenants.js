@@ -20,7 +20,17 @@ router.get("/:id", async (req, res) => {
   try {
     const tenant = await req.app.locals.prisma.tenant.findFirst({
       where: { id: req.params.id, organizationId: req.organizationId },
-      include: { leases: true, transactions: true, maintenanceRequests: true },
+      include: {
+        leases: {
+          include: { unit: { include: { property: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+        transactions: { orderBy: { createdAt: "desc" } },
+        maintenanceRequests: {
+          include: { unit: true },
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
     if (!tenant) return res.status(404).json({ error: "Not found" });
     res.json(tenant);

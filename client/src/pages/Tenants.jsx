@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -19,6 +20,7 @@ const PAGE_SIZE = 10;
 
 export default function Tenants() {
   const addToast = useToast();
+  const navigate = useNavigate();
 
   const [tenants, setTenants] = useState([]);
   const [leases, setLeases] = useState([]);
@@ -270,7 +272,11 @@ export default function Tenants() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginated.map((tenant) => (
-                  <tr key={tenant.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={tenant.id}
+                    onClick={() => navigate(`/tenants/${tenant.id}`)}
+                    className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  >
                     {/* Name + avatar */}
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -307,7 +313,10 @@ export default function Tenants() {
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => openEdit(tenant)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(tenant);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                           title="Edit"
                         >
@@ -321,7 +330,10 @@ export default function Tenants() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(tenant)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(tenant);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                           title="Delete"
                         >

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -56,6 +57,7 @@ const isWithinLastWeek = (dateStr) => {
 
 export default function Leads() {
   const toast = useToast();
+  const navigate = useNavigate();
 
   // Data state
   const [leads, setLeads] = useState([]);
@@ -353,7 +355,11 @@ export default function Leads() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginated.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={lead.id}
+                    onClick={() => navigate(`/leads/${lead.id}`)}
+                    className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700">
@@ -391,7 +397,10 @@ export default function Leads() {
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => openEdit(lead)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(lead);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                           title="Edit"
                         >
@@ -405,7 +414,10 @@ export default function Leads() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(lead)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(lead);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                           title="Delete"
                         >

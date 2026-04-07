@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import StatusBadge from "../components/StatusBadge";
@@ -41,6 +41,8 @@ export default function LeaseDetail() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [needsTemplate, setNeedsTemplate] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   async function fetchLease() {
     try {
@@ -59,6 +61,28 @@ export default function LeaseDetail() {
     }
     load();
   }, [id]);
+
+  async function handleFileSelected(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const lower = f.name.toLowerCase();
+    if (!lower.endsWith(".docx") && !lower.endsWith(".pdf")) {
+      addToast("Only .docx or .pdf files are allowed", "error");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      await api.uploadLeaseDocument(id, f);
+      await fetchLease();
+      addToast("Document uploaded");
+    } catch (err) {
+      addToast(err.message || "Upload failed", "error");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
 
   async function runAction(fn, successMessage) {
     setActing(true);
@@ -174,20 +198,47 @@ export default function LeaseDetail() {
           <div className="rounded-xl border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-semibold text-gray-900">Lease Document</h2>
-              {lease.documentUrl && (
-                <a
-                  href={api.leaseDocumentUrl(id)}
-                  download
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors cursor-pointer"
+                  title="Attach a signed .docx or .pdf to this lease"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  Download DOCX
-                </a>
-              )}
+                  {uploading ? "Uploading..." : lease.documentUrl ? "Replace" : "Upload"}
+                </button>
+                {lease.documentUrl && (
+                  <a
+                    href={api.leaseDocumentDownloadUrl(id)}
+                    download
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download {lease.documentExtension === "pdf" ? "PDF" : "DOCX"}
+                  </a>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                onChange={handleFileSelected}
+                className="hidden"
+              />
             </div>
-            {lease.leaseHtml ? (
+            {lease.documentExtension === "pdf" ? (
+              <iframe
+                title="Lease Document Preview"
+                src={api.leaseDocumentUrl(id)}
+                className="w-full rounded-b-xl"
+                style={{ height: "800px", border: 0 }}
+              />
+            ) : lease.leaseHtml ? (
               <iframe
                 title="Lease Document Preview"
                 srcDoc={lease.leaseHtml}

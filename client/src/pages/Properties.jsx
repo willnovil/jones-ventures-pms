@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
 
 export default function Properties() {
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -379,7 +381,11 @@ export default function Properties() {
               {filtered.map((property) => {
                 const { total, occupied, pct } = getOccupancy(property);
                 return (
-                  <tr key={property.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={property.id}
+                    onClick={() => navigate(`/properties/${property.id}`)}
+                    className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  >
                     <td className="px-5 py-4">
                       <p className="text-sm font-semibold text-gray-900">{property.name}</p>
                     </td>
@@ -409,7 +415,10 @@ export default function Properties() {
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => openEdit(property)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(property);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                           title="Edit"
                         >
@@ -418,7 +427,10 @@ export default function Properties() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(property)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(property);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                           title="Delete"
                         >

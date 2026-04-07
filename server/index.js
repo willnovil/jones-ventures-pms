@@ -14,6 +14,7 @@ import maintenanceRouter from "./routes/maintenance.js";
 import leadsRouter from "./routes/leads.js";
 import dashboardRouter from "./routes/dashboard.js";
 import templatesRouter from "./routes/templates.js";
+import importsRouter from "./routes/imports.js";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -49,6 +50,7 @@ app.use("/api/transactions", transactionsRouter);
 app.use("/api/maintenance", maintenanceRouter);
 app.use("/api/leads", leadsRouter);
 app.use("/api/templates", templatesRouter);
+app.use("/api/imports", importsRouter);
 
 // Global error handler
 app.use((err, _req, res, _next) => {

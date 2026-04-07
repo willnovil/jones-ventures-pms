@@ -49,8 +49,39 @@ export const api = {
   createLease: (data) => request("/leases", { method: "POST", body: JSON.stringify(data) }),
   updateLease: (id, data) => request(`/leases/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteLease: (id) => request(`/leases/${id}`, { method: "DELETE" }),
+  importExistingLease: async (formData) => {
+    // formData is a FormData instance built by the AddExistingLease page.
+    // We don't pass Content-Type — the browser sets the multipart boundary.
+    const res = await fetch("/api/leases/import-existing", {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Import failed");
+    }
+    return res.json();
+  },
   generateLeaseDocument: (id) => request(`/leases/${id}/generate`, { method: "POST" }),
   leaseDocumentUrl: (id) => `/api/leases/${id}/document`,
+  // Append ?download=1 so the server forces an attachment Content-Disposition
+  // (otherwise PDFs render inline, which is what the iframe preview wants).
+  leaseDocumentDownloadUrl: (id) => `/api/leases/${id}/document?download=1`,
+  uploadLeaseDocument: async (id, file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/leases/${id}/upload-document`, {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Upload failed");
+    }
+    return res.json();
+  },
   reviewLease: (id) => request(`/leases/${id}/review`, { method: "POST" }),
   approveLease: (id, approvedBy) => request(`/leases/${id}/approve`, { method: "POST", body: JSON.stringify({ approvedBy }) }),
   sendLease: (id) => request(`/leases/${id}/send`, { method: "POST" }),
@@ -97,4 +128,64 @@ export const api = {
 
   // Dashboard
   getDashboard: () => request("/dashboard"),
+
+  // Imports — Yardi unit directory xlsx
+  previewYardiImport: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/imports/yardi-units/preview", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Preview failed");
+    }
+    return res.json();
+  },
+  commitYardiImport: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/imports/yardi-units/commit", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Import failed");
+    }
+    return res.json();
+  },
+
+  // Yardi Rent Roll xlsx → Tenants + Leases
+  previewRentRollImport: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/imports/yardi-rentroll/preview", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Preview failed");
+    }
+    return res.json();
+  },
+  commitRentRollImport: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/imports/yardi-rentroll/commit", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Import failed");
+    }
+    return res.json();
+  },
 };

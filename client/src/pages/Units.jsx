@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -26,6 +27,7 @@ const emptyForm = {
 
 export default function Units() {
   const toast = useToast();
+  const navigate = useNavigate();
 
   // Data state
   const [units, setUnits] = useState([]);
@@ -321,7 +323,11 @@ export default function Units() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginated.map((unit) => (
-                  <tr key={unit.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr
+                    key={unit.id}
+                    onClick={() => navigate(`/units/${unit.id}`)}
+                    className="cursor-pointer hover:bg-gray-50/50 transition-colors"
+                  >
                     <td className="px-5 py-4">
                       <p className="text-sm font-semibold text-gray-900">{unit.unitNumber}</p>
                     </td>
@@ -349,7 +355,10 @@ export default function Units() {
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={() => openEdit(unit)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(unit);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                           title="Edit"
                         >
@@ -363,7 +372,10 @@ export default function Units() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => setDeleteTarget(unit)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(unit);
+                          }}
                           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                           title="Delete"
                         >

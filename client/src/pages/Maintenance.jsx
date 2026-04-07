@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import Modal from "../components/Modal";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -44,6 +45,7 @@ function getInitials(firstName, lastName) {
 
 export default function Maintenance() {
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [requests, setRequests] = useState([]);
   const [units, setUnits] = useState([]);
@@ -349,7 +351,8 @@ export default function Maintenance() {
               {paginated.map((request) => (
                 <tr
                   key={request.id}
-                  className={`hover:bg-gray-50/50 transition-colors ${
+                  onClick={() => navigate(`/maintenance/${request.id}`)}
+                  className={`cursor-pointer hover:bg-gray-50/50 transition-colors ${
                     request.priority === "EMERGENCY" ? "bg-red-50/50" : ""
                   }`}
                 >
@@ -391,7 +394,10 @@ export default function Maintenance() {
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        onClick={() => openEdit(request)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEdit(request);
+                        }}
                         className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors cursor-pointer"
                         title="Edit"
                       >
@@ -400,7 +406,10 @@ export default function Maintenance() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => setDeleteTarget(request)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(request);
+                        }}
                         className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                         title="Delete"
                       >
