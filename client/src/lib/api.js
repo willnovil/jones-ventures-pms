@@ -2,9 +2,17 @@ const BASE = "/api";
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
+  if (res.status === 401) {
+    // Session expired or never signed in — bounce to login.
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.assign("/login");
+    }
+    throw new Error("Not signed in");
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || "Request failed");
@@ -53,7 +61,11 @@ export const api = {
   uploadLeaseTemplate: async (file) => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/templates/lease", { method: "POST", body: form });
+    const res = await fetch("/api/templates/lease", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || "Upload failed");

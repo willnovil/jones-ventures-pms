@@ -7,16 +7,27 @@ import {
   renderLeaseDocx,
   docxToHtml,
 } from "../lib/leaseDocx.js";
-import { LEASE_TEMPLATE_PATH } from "./templates.js";
+import { leaseTemplatePathFor } from "./templates.js";
+import { requireOrganization } from "../middleware/requireOrganization.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LEASE_DOCS_DIR = path.join(__dirname, "..", "storage", "leases");
+const STORAGE_ROOT = path.join(__dirname, "..", "storage");
+
+// Per-org per-lease document storage.
+function leaseDocsDirFor(organizationId) {
+  return path.join(STORAGE_ROOT, organizationId, "leases");
+}
+function leaseDocPathFor(organizationId, leaseId) {
+  return path.join(leaseDocsDirFor(organizationId), `${leaseId}.docx`);
+}
 
 const router = Router();
+router.use(requireOrganization);
 
 router.get("/", async (req, res) => {
   try {
     const leases = await req.app.locals.prisma.lease.findMany({
+      where: { organizationId: req.organizationId },
       include: { unit: { include: { property: true } }, tenant: true },
       orderBy: { createdAt: "desc" },
     });
@@ -28,8 +39,8 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const lease = await req.app.locals.prisma.lease.findUnique({
-      where: { id: req.params.id },
+    const lease = await req.app.locals.prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
       include: { unit: true, tenant: true, transactions: true, documents: true },
     });
     if (!lease) return res.status(404).json({ error: "Not found" });
@@ -42,7 +53,24 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
-    const lease = await prisma.lease.create({ data: req.body });
+    // FK validation
+    if (req.body.unitId) {
+      const unit = await prisma.unit.findFirst({
+        where: { id: req.body.unitId, organizationId: req.organizationId },
+        select: { id: true },
+      });
+      if (!unit) return res.status(400).json({ error: "Invalid unitId" });
+    }
+    if (req.body.tenantId) {
+      const tenant = await prisma.tenant.findFirst({
+        where: { id: req.body.tenantId, organizationId: req.organizationId },
+        select: { id: true },
+      });
+      if (!tenant) return res.status(400).json({ error: "Invalid tenantId" });
+    }
+    const lease = await prisma.lease.create({
+      data: { ...req.body, organizationId: req.organizationId },
+    });
 
     // Auto-set unit to OCCUPIED when creating an active lease
     if (lease.status === "ACTIVE" && lease.unitId) {
@@ -61,6 +89,12 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const existing = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
     const lease = await prisma.lease.update({
       where: { id: req.params.id },
       data: req.body,
@@ -76,7 +110,12 @@ router.put("/:id", async (req, res) => {
       } else if (lease.status === "EXPIRED" || lease.status === "TERMINATED") {
         // Only set VACANT if no other active lease exists on this unit
         const otherActive = await prisma.lease.count({
-          where: { unitId: lease.unitId, status: "ACTIVE", id: { not: lease.id } },
+          where: {
+            organizationId: req.organizationId,
+            unitId: lease.unitId,
+            status: "ACTIVE",
+            id: { not: lease.id },
+          },
         });
         if (otherActive === 0) {
           await prisma.unit.update({
@@ -98,16 +137,17 @@ router.put("/:id", async (req, res) => {
 router.post("/:id/generate", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
-    const lease = await prisma.lease.findUnique({
-      where: { id: req.params.id },
+    const lease = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
       include: { tenant: true, unit: { include: { property: true } } },
     });
     if (!lease) return res.status(404).json({ error: "Not found" });
 
-    // Read the user-uploaded lease template (.docx).
+    // Read the user-uploaded lease template (.docx) for this org.
+    const templatePath = leaseTemplatePathFor(req.organizationId);
     let templateBuffer;
     try {
-      templateBuffer = await fs.readFile(LEASE_TEMPLATE_PATH);
+      templateBuffer = await fs.readFile(templatePath);
     } catch (err) {
       if (err.code === "ENOENT") {
         return res.status(400).json({
@@ -122,9 +162,10 @@ router.post("/:id/generate", async (req, res) => {
     const data = buildLeaseData(lease);
     const filledDocx = renderLeaseDocx(templateBuffer, data);
 
-    // Persist the filled .docx to per-lease storage.
-    await fs.mkdir(LEASE_DOCS_DIR, { recursive: true });
-    const docxPath = path.join(LEASE_DOCS_DIR, `${lease.id}.docx`);
+    // Persist the filled .docx to per-org per-lease storage.
+    const docsDir = leaseDocsDirFor(req.organizationId);
+    await fs.mkdir(docsDir, { recursive: true });
+    const docxPath = leaseDocPathFor(req.organizationId, lease.id);
     await fs.writeFile(docxPath, filledDocx);
 
     // Convert to HTML for the in-app preview.
@@ -144,10 +185,17 @@ router.post("/:id/generate", async (req, res) => {
   }
 });
 
-// GET /api/leases/:id/document — stream the filled .docx for download
+// GET /api/leases/:id/document — stream the filled .docx for download.
+// Verifies ownership before serving the file.
 router.get("/:id/document", async (req, res) => {
   try {
-    const docxPath = path.join(LEASE_DOCS_DIR, `${req.params.id}.docx`);
+    const lease = await req.app.locals.prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!lease) return res.status(404).json({ error: "Not found" });
+
+    const docxPath = leaseDocPathFor(req.organizationId, lease.id);
     const buffer = await fs.readFile(docxPath);
     res.setHeader(
       "Content-Type",
@@ -155,7 +203,7 @@ router.get("/:id/document", async (req, res) => {
     );
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="lease-${req.params.id}.docx"`
+      `attachment; filename="lease-${lease.id}.docx"`
     );
     res.send(buffer);
   } catch (err) {
@@ -169,6 +217,11 @@ router.get("/:id/document", async (req, res) => {
 router.post("/:id/review", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const existing = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const updated = await prisma.lease.update({
       where: { id: req.params.id },
       data: { status: "PENDING_REVIEW", reviewedAt: new Date() },
@@ -182,11 +235,16 @@ router.post("/:id/review", async (req, res) => {
 router.post("/:id/approve", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const existing = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const updated = await prisma.lease.update({
       where: { id: req.params.id },
       data: {
         status: "APPROVED",
-        approvedBy: req.body.approvedBy || "system",
+        approvedBy: req.body.approvedBy || req.user?.email || "system",
         approvedAt: new Date(),
       },
     });
@@ -199,6 +257,11 @@ router.post("/:id/approve", async (req, res) => {
 router.post("/:id/send", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const existing = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const updated = await prisma.lease.update({
       where: { id: req.params.id },
       data: { status: "SENT", signatureStatus: "SENT", sentAt: new Date() },
@@ -212,6 +275,11 @@ router.post("/:id/send", async (req, res) => {
 router.post("/:id/sign", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const existing = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Not found" });
     const updated = await prisma.lease.update({
       where: { id: req.params.id },
       data: {
@@ -238,13 +306,21 @@ router.post("/:id/sign", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
-    const lease = await prisma.lease.findUnique({ where: { id: req.params.id } });
+    const lease = await prisma.lease.findFirst({
+      where: { id: req.params.id, organizationId: req.organizationId },
+    });
+    if (!lease) return res.status(404).json({ error: "Not found" });
+
     await prisma.lease.delete({ where: { id: req.params.id } });
 
     // If deleted lease was active, check if unit should go vacant
-    if (lease && lease.unitId && lease.status === "ACTIVE") {
+    if (lease.unitId && lease.status === "ACTIVE") {
       const otherActive = await prisma.lease.count({
-        where: { unitId: lease.unitId, status: "ACTIVE" },
+        where: {
+          organizationId: req.organizationId,
+          unitId: lease.unitId,
+          status: "ACTIVE",
+        },
       });
       if (otherActive === 0) {
         await prisma.unit.update({

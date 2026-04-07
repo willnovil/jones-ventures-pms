@@ -2,7 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { PrismaClient } from "@prisma/client";
+import { toNodeHandler } from "better-auth/node";
 
+import { auth } from "./lib/auth.js";
 import propertiesRouter from "./routes/properties.js";
 import unitsRouter from "./routes/units.js";
 import tenantsRouter from "./routes/tenants.js";
@@ -17,7 +19,18 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: "http://localhost:5173" }));
+// CORS — must allow credentials so the client cookie reaches us
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    credentials: true,
+  })
+);
+
+// Better Auth handler — MUST be mounted BEFORE express.json() because
+// it parses its own request bodies. Express 5 wildcard syntax.
+app.all("/api/auth/{*any}", toNodeHandler(auth));
+
 app.use(express.json());
 
 // Make prisma available to routes

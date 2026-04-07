@@ -1,10 +1,13 @@
 import { Router } from "express";
+import { requireOrganization } from "../middleware/requireOrganization.js";
 
 const router = Router();
+router.use(requireOrganization);
 
 router.get("/", async (req, res) => {
   try {
     const prisma = req.app.locals.prisma;
+    const orgId = req.organizationId;
 
     const [
       totalProperties,
@@ -22,15 +25,16 @@ router.get("/", async (req, res) => {
       recentMaintenance,
       recentLeads,
     ] = await Promise.all([
-      prisma.property.count(),
-      prisma.unit.count(),
-      prisma.unit.count({ where: { status: "VACANT" } }),
-      prisma.unit.count({ where: { status: "OCCUPIED" } }),
-      prisma.unit.count({ where: { status: "MAINTENANCE" } }),
-      prisma.tenant.count(),
-      prisma.lease.count({ where: { status: "ACTIVE" } }),
+      prisma.property.count({ where: { organizationId: orgId } }),
+      prisma.unit.count({ where: { organizationId: orgId } }),
+      prisma.unit.count({ where: { organizationId: orgId, status: "VACANT" } }),
+      prisma.unit.count({ where: { organizationId: orgId, status: "OCCUPIED" } }),
+      prisma.unit.count({ where: { organizationId: orgId, status: "MAINTENANCE" } }),
+      prisma.tenant.count({ where: { organizationId: orgId } }),
+      prisma.lease.count({ where: { organizationId: orgId, status: "ACTIVE" } }),
       prisma.lease.count({
         where: {
+          organizationId: orgId,
           status: "ACTIVE",
           endDate: {
             lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
@@ -38,26 +42,40 @@ router.get("/", async (req, res) => {
           },
         },
       }),
-      prisma.maintenanceRequest.count({ where: { status: "OPEN" } }),
-      prisma.maintenanceRequest.count({ where: { status: "IN_PROGRESS" } }),
-      prisma.lead.count({ where: { status: "NEW" } }),
-      prisma.transaction.findMany({ take: 5, orderBy: { createdAt: "desc" }, include: { tenant: true } }),
-      prisma.maintenanceRequest.findMany({ take: 5, orderBy: { createdAt: "desc" }, include: { unit: true, tenant: true } }),
-      prisma.lead.findMany({ take: 5, orderBy: { createdAt: "desc" } }),
+      prisma.maintenanceRequest.count({ where: { organizationId: orgId, status: "OPEN" } }),
+      prisma.maintenanceRequest.count({ where: { organizationId: orgId, status: "IN_PROGRESS" } }),
+      prisma.lead.count({ where: { organizationId: orgId, status: "NEW" } }),
+      prisma.transaction.findMany({
+        where: { organizationId: orgId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { tenant: true },
+      }),
+      prisma.maintenanceRequest.findMany({
+        where: { organizationId: orgId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { unit: true, tenant: true },
+      }),
+      prisma.lead.findMany({
+        where: { organizationId: orgId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
 
     const totalRentExpected = await prisma.lease.aggregate({
-      where: { status: "ACTIVE" },
+      where: { organizationId: orgId, status: "ACTIVE" },
       _sum: { rentAmount: true },
     });
 
     const totalCollected = await prisma.transaction.aggregate({
-      where: { type: "PAYMENT" },
+      where: { organizationId: orgId, type: "PAYMENT" },
       _sum: { amount: true },
     });
 
     const totalOutstanding = await prisma.transaction.aggregate({
-      where: { type: "CHARGE", paidDate: null },
+      where: { organizationId: orgId, type: "CHARGE", paidDate: null },
       _sum: { amount: true },
     });
 
