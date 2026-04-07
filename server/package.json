@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch index.js",
+    "dev:safe": "prisma generate && node --watch index.js",
     "start": "node index.js",
+    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
