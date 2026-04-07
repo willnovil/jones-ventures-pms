@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "../lib/api";
 import StatusBadge from "../components/StatusBadge";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -40,6 +40,7 @@ export default function LeaseDetail() {
   const [lease, setLease] = useState(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+  const [needsTemplate, setNeedsTemplate] = useState(false);
 
   async function fetchLease() {
     try {
@@ -64,9 +65,14 @@ export default function LeaseDetail() {
     try {
       await fn();
       await fetchLease();
+      setNeedsTemplate(false);
       addToast(successMessage);
     } catch (err) {
-      addToast(err.message || "Action failed", "error");
+      const message = err.message || "Action failed";
+      if (message.toLowerCase().includes("no lease template")) {
+        setNeedsTemplate(true);
+      }
+      addToast(message, "error");
     } finally {
       setActing(false);
     }
@@ -166,8 +172,20 @@ export default function LeaseDetail() {
         {/* Document Preview (2/3) */}
         <div className="lg:col-span-2">
           <div className="rounded-xl border border-gray-200 bg-white">
-            <div className="border-b border-gray-200 px-5 py-4">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <h2 className="text-sm font-semibold text-gray-900">Lease Document</h2>
+              {lease.documentUrl && (
+                <a
+                  href={api.leaseDocumentUrl(id)}
+                  download
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download DOCX
+                </a>
+              )}
             </div>
             {lease.leaseHtml ? (
               <iframe
@@ -176,6 +194,22 @@ export default function LeaseDetail() {
                 className="w-full rounded-b-xl"
                 style={{ height: "800px", border: 0 }}
               />
+            ) : needsTemplate ? (
+              <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
+                <svg className="w-12 h-12 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="mt-3 text-sm font-medium text-gray-900">No lease template uploaded</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Upload your lease document on the Templates page first.
+                </p>
+                <Link
+                  to="/templates"
+                  className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 cursor-pointer"
+                >
+                  Go to Templates
+                </Link>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center px-5 py-16 text-center">
                 <svg

@@ -1,5 +1,16 @@
 import { Router } from "express";
-import { renderLeaseHtml } from "../lib/leaseTemplate.js";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  buildLeaseData,
+  renderLeaseDocx,
+  docxToHtml,
+} from "../lib/leaseDocx.js";
+import { LEASE_TEMPLATE_PATH } from "./templates.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const LEASE_DOCS_DIR = path.join(__dirname, "..", "storage", "leases");
 
 const router = Router();
 
@@ -93,14 +104,65 @@ router.post("/:id/generate", async (req, res) => {
     });
     if (!lease) return res.status(404).json({ error: "Not found" });
 
-    const leaseHtml = renderLeaseHtml(lease);
+    // Read the user-uploaded lease template (.docx).
+    let templateBuffer;
+    try {
+      templateBuffer = await fs.readFile(LEASE_TEMPLATE_PATH);
+    } catch (err) {
+      if (err.code === "ENOENT") {
+        return res.status(400).json({
+          error: "No lease template uploaded. Upload one in Templates first.",
+          code: "NO_TEMPLATE",
+        });
+      }
+      throw err;
+    }
+
+    // Render the .docx with the lease data.
+    const data = buildLeaseData(lease);
+    const filledDocx = renderLeaseDocx(templateBuffer, data);
+
+    // Persist the filled .docx to per-lease storage.
+    await fs.mkdir(LEASE_DOCS_DIR, { recursive: true });
+    const docxPath = path.join(LEASE_DOCS_DIR, `${lease.id}.docx`);
+    await fs.writeFile(docxPath, filledDocx);
+
+    // Convert to HTML for the in-app preview.
+    const leaseHtml = await docxToHtml(filledDocx);
+
     const updated = await prisma.lease.update({
       where: { id: req.params.id },
-      data: { leaseHtml, status: "DRAFT" },
+      data: {
+        leaseHtml,
+        documentUrl: `/api/leases/${lease.id}/document`,
+        status: "DRAFT",
+      },
     });
     res.json(updated);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/leases/:id/document — stream the filled .docx for download
+router.get("/:id/document", async (req, res) => {
+  try {
+    const docxPath = path.join(LEASE_DOCS_DIR, `${req.params.id}.docx`);
+    const buffer = await fs.readFile(docxPath);
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="lease-${req.params.id}.docx"`
+    );
+    res.send(buffer);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return res.status(404).json({ error: "Document not generated yet" });
+    }
+    res.status(500).json({ error: err.message });
   }
 });
 

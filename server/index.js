@@ -11,6 +11,7 @@ import transactionsRouter from "./routes/transactions.js";
 import maintenanceRouter from "./routes/maintenance.js";
 import leadsRouter from "./routes/leads.js";
 import dashboardRouter from "./routes/dashboard.js";
+import templatesRouter from "./routes/templates.js";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -34,6 +35,7 @@ app.use("/api/leases", leasesRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/maintenance", maintenanceRouter);
 app.use("/api/leads", leadsRouter);
+app.use("/api/templates", templatesRouter);
 
 // Global error handler
 app.use((err, _req, res, _next) => {

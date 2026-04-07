@@ -42,10 +42,25 @@ export const api = {
   updateLease: (id, data) => request(`/leases/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteLease: (id) => request(`/leases/${id}`, { method: "DELETE" }),
   generateLeaseDocument: (id) => request(`/leases/${id}/generate`, { method: "POST" }),
+  leaseDocumentUrl: (id) => `/api/leases/${id}/document`,
   reviewLease: (id) => request(`/leases/${id}/review`, { method: "POST" }),
   approveLease: (id, approvedBy) => request(`/leases/${id}/approve`, { method: "POST", body: JSON.stringify({ approvedBy }) }),
   sendLease: (id) => request(`/leases/${id}/send`, { method: "POST" }),
   signLease: (id) => request(`/leases/${id}/sign`, { method: "POST" }),
+
+  // Templates
+  getLeaseTemplate: () => request("/templates/lease"),
+  uploadLeaseTemplate: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/templates/lease", { method: "POST", body: form });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || "Upload failed");
+    }
+    return res.json();
+  },
+  deleteLeaseTemplate: () => request("/templates/lease", { method: "DELETE" }),
 
   // Transactions
   getTransactions: () => request("/transactions"),
