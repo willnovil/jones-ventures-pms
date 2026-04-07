@@ -454,7 +454,15 @@ export default function Transactions() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Lease</label>
               <select
                 value={form.leaseId}
-                onChange={(e) => setForm({ ...form, leaseId: e.target.value })}
+                onChange={(e) => {
+                  const leaseId = e.target.value;
+                  const selectedLease = leases.find((l) => l.id === leaseId);
+                  setForm({
+                    ...form,
+                    leaseId,
+                    tenantId: selectedLease?.tenantId || form.tenantId,
+                  });
+                }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="">Select lease...</option>

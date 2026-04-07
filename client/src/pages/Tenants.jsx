@@ -22,6 +22,7 @@ export default function Tenants() {
 
   const [tenants, setTenants] = useState([]);
   const [leases, setLeases] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -38,9 +39,10 @@ export default function Tenants() {
   /* ---------- Data fetching ---------- */
   async function fetchData() {
     try {
-      const [t, l] = await Promise.all([api.getTenants(), api.getLeases()]);
+      const [t, l, txns] = await Promise.all([api.getTenants(), api.getLeases(), api.getTransactions()]);
       setTenants(t);
       setLeases(l);
+      setTransactions(txns);
     } catch (err) {
       addToast(err.message, "error");
     } finally {
@@ -75,11 +77,18 @@ export default function Tenants() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
 
+  // Count tenants who have unpaid charges
+  const tenantsWithBalance = new Set(
+    transactions
+      .filter((t) => t.type === "CHARGE" && !t.paidDate)
+      .map((t) => t.tenantId)
+  ).size;
+
   const stats = [
     { label: "Total Tenants", value: totalTenants },
     { label: "Active Leases", value: activeLeases },
     { label: "New This Month", value: newThisMonth },
-    { label: "With Balance", value: 0 },
+    { label: "With Balance", value: tenantsWithBalance },
   ];
 
   /* ---------- Helpers ---------- */
